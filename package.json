@@ -1,0 +1,52 @@
+{
+  "name": "local-download-data",
+  "version": "1.0.0",
+  "description": "Download open data for local processing",
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
+  "engines": {
+    "node": ">=10.0.0"
+  },
+  "files": [
+    "build/src"
+  ],
+  "license": "Apache-2.0",
+  "keywords": [],
+  "jest": {
+    "testEnvironment": "node"
+  },
+  "scripts": {
+    "test": "jest test/test.js --runInBand --forceExit",
+    "check": "gts check src/**/*.ts src/*.ts",
+    "clean": "gts clean src/**/*.ts src/*.ts",
+    "compile": "tsc",
+    "build": "npm run fix && npm run check && npm run compile",
+    "fix": "gts fix src/**/*.ts src/*.ts",
+    "exec": "tsc && node build/index",
+    "docs": "swagger-jsdoc -d docs/swagger.definition.json -o docs/swagger.json src/index.ts && java -jar ../swagger-codegen-cli.jar generate -i ./docs/swagger.json -l html2 -o ./docs/"
+  },
+  "devDependencies": {
+    "@types/follow-redirects": "^1.13.0",
+    "@types/node": "^14.14.44",
+    "@types/node-fetch": "^2.5.10",
+    "@types/pg": "^7.14.11",
+    "eslint": "^7.26.0",
+    "gts": "^3.1.0",
+    "jest": "^26.6.3",
+    "ts-node": "^9.1.1",
+    "typescript": "^4.0.3"
+  },
+  "dependencies": {
+    "cheerio": "*",
+    "dotenv": "^9.0.2",
+    "fast-xml-parser": "^3.19.0",
+    "follow-redirects": "^1.14.1",
+    "local-logger": "file:../local-logger",
+    "local-microservice": "file:../local-microservice",
+    "local-pm2-config": "file:../local-pm2-config",
+    "node-fetch": "^2.6.1",
+    "path": "^0.12.7",
+    "pg": "^8.6.0",
+    "url": "^0.11.0"
+  }
+}
