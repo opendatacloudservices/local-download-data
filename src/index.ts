@@ -4,13 +4,17 @@ import {Client} from 'pg';
 import fetch from 'node-fetch';
 import {
   failedFile,
-  resetFiles,
   getFile,
   updateFile,
   getNextDownload,
 } from './postgres/index';
 import * as pm2 from 'local-pm2-config';
-import {download} from './download';
+import {
+  download,
+  resetMissingDownloads,
+  resetDownloads,
+  removeEmpty,
+} from './download';
 
 // get environmental variables
 dotenv.config({path: path.join(__dirname, '../.env')});
@@ -22,7 +26,7 @@ import {addToken, startTransaction, localTokens, logError} from 'local-logger';
 // number of parallel processes
 let processCount = 1;
 pm2.apps.forEach(app => {
-  if (app.name === 'local-ckan-harvester') {
+  if (app.name === 'local-download-data') {
     processCount = app.max;
   }
 });
@@ -41,9 +45,10 @@ const client = new Client({
 });
 client
   .connect()
-  .then(() => {
-    return resetFiles(client);
-  })
+  .then(() => resetMissingDownloads(client))
+  .then(() => resetDownloads(client))
+  .then(() => removeEmpty(client))
+  .then(() => console.log('ready'))
   .catch(err => {
     logError({message: err});
   });
@@ -76,8 +81,8 @@ api.get('/download/all', async (req, res) => {
         )
       );
     }
-    await Promise.all(fetchs);
     res.status(200).json({message: 'Download initiated'});
+    await Promise.all(fetchs);
   } else {
     res.status(200).json({message: 'Download already in progress'});
   }
@@ -160,9 +165,14 @@ api.get('/download/file/:fileId', (req, res) => {
             file.state = 'ignore';
           } else {
             file.state = 'downloaded';
-            file.file = name;
+            file.file = name.source;
           }
-          return updateFile(client, file).then(async () => {
+          return updateFile(
+            client,
+            file,
+            name ? name.files : [],
+            name && name.layers ? name.layers : []
+          ).then(async () => {
             await fetch(
               addToken(
                 `http://localhost:${process.env.PORT}/download/next`,
@@ -172,7 +182,7 @@ api.get('/download/file/:fileId', (req, res) => {
             trans(true, {
               message: 'download completed',
               id: fileId,
-              filename: name,
+              filename: name ? name.source : '',
             });
           });
         })

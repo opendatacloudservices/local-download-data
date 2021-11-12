@@ -4,79 +4,93 @@ import {logInfo} from 'local-logger';
 // for now we only accept machine readable data
 // acceptedFormat is combined with acceptedMimetype (see below)
 const acceptedFormat = [
-  'csv',
-  'xlsx',
-  'html',
-  'zip', // unpack
-  'xml',
-  'json',
-  'gml',
-  'view',
-  'karte',
-  'webanwendung',
-  'shp',
-  'xplangml',
-  'wfs', // special
-  'geojson',
-  'kml',
-  'atom',
-  'txt',
-  'kmz',
-  'ascii',
-  'xml/soap',
-  'application/ld+json',
-  'gpx',
-  'nas', // special
-  'rdf',
-  'geodatabase',
-  'rss',
-  'gzip', // unpack
-  'rar', //unpack
-  'citygml',
-  'dxf',
-  'gtfs',
-  'tcx',
-  'filegeodatabase',
-  'gpkg',
-  'tsv',
   '7z',
+  'application/ld+json',
+  'ascii',
+  'atom',
+  'citygml',
+  'csv',
+  'download',
+  'dxf',
+  'filegeodatabase',
+  'geodatabase',
+  'geojson',
+  'gml',
+  'gpkg',
+  'gpx',
+  'gtfs',
+  'gzip', // unpack
+  // 'html',
   'json-ld',
+  'json',
+  'karte',
+  'kml',
+  'kmz',
+  'nas', // special
+  // 'oracle',
+  'postgres',
+  'rar', //unpack
+  'rdf',
+  'rss',
+  'shp',
+  'tcx',
+  'tsv',
+  'tsv',
+  'txt',
+  // 'view',
+  // 'webanwendung',
+  'wfs', // special
+  'xlsx',
+  'xml',
+  'xml/soap',
+  'xplangml',
+  'zip', // unpack
 ];
 
+const bannedFormats = ['wms', 'pdf', 'jpeg', 'png', 'geotiff'];
+
 const acceptedMimetype = [
-  'text/csv',
-  'application/zip',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/xml',
-  'application/vnd.ms-excel',
-  'text/html',
-  'application/json',
-  'application/vnd.google-earth.kml+xml',
   'application/geo+json',
   'application/gml+xml',
-  'text/plain',
-  'application/x-httpd-php',
-  'application/vnd.google-earth.kmz',
-  'application/rdf+xml',
-  'application/gzip',
   'application/gpx+xml',
+  'application/gzip',
+  'application/json',
+  'application/ld+json',
+  'application/rdf+xml',
+  'application/rss+xml',
+  'application/vnd.google-earth.kml+xml',
+  'application/vnd.google-earth.kmz',
+  'application/vnd.ms-excel',
+  'application/vnd.oasis.opendocument.spreadsheet',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.rar',
   'application/x-7z-compressed',
-  'application/vnd.oasis.opendocument.spreadsheet',
-  'application/rss+xml',
+  // 'application/x-httpd-php',
+  'application/xml',
+  'application/zip',
+  'text/csv',
+  // 'text/html', // html makes no sense at this time
+  'text/plain',
   'text/sgml',
   'text/tab-separated-values',
   'text/yaml',
-  'application/ld+json',
 ];
 
 export const accept = (file: File): boolean => {
   let accepted = false;
-  if (acceptedFormat.includes(file.format)) {
+  if (
+    file.format &&
+    acceptedFormat.includes(file.format.toLowerCase()) &&
+    !bannedFormats.includes(file.format.toLowerCase())
+  ) {
     accepted = true;
-  } else if (acceptedMimetype.includes(file.mimetype)) {
+  } else if (
+    file.mimetype &&
+    acceptedMimetype.includes(file.mimetype.toLowerCase()) &&
+    !bannedFormats.includes(file.format.toLowerCase())
+  ) {
     accepted = true;
-  } else if (file.mimetype === 'false') {
+  } else if (file.mimetype && file.mimetype === 'false') {
     logInfo({
       type: 'unknown fileformat',
       message: file,

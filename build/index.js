@@ -14,7 +14,7 @@ const local_logger_1 = require("local-logger");
 // number of parallel processes
 let processCount = 1;
 pm2.apps.forEach(app => {
-    if (app.name === 'local-ckan-harvester') {
+    if (app.name === 'local-download-data') {
         processCount = app.max;
     }
 });
@@ -32,11 +32,12 @@ const client = new pg_1.Client({
 });
 client
     .connect()
-    .then(() => {
-    return index_1.resetFiles(client);
-})
+    .then(() => (0, download_1.resetMissingDownloads)(client))
+    .then(() => (0, download_1.resetDownloads)(client))
+    .then(() => (0, download_1.removeEmpty)(client))
+    .then(() => console.log('ready'))
     .catch(err => {
-    local_logger_1.logError({ message: err });
+    (0, local_logger_1.logError)({ message: err });
 });
 /**
  * @swagger
@@ -60,10 +61,10 @@ local_microservice_1.api.get('/download/all', async (req, res) => {
         const fetchs = [];
         for (let i = 0; i < parallelCount; i += 1) {
             progress.count += 1;
-            fetchs.push(node_fetch_1.default(local_logger_1.addToken(`http://localhost:${process.env.PORT}/download/next`, res)));
+            fetchs.push((0, node_fetch_1.default)((0, local_logger_1.addToken)(`http://localhost:${process.env.PORT}/download/next`, res)));
         }
-        await Promise.all(fetchs);
         res.status(200).json({ message: 'Download initiated' });
+        await Promise.all(fetchs);
     }
     else {
         res.status(200).json({ message: 'Download already in progress' });
@@ -85,13 +86,13 @@ local_microservice_1.api.get('/download/all', async (req, res) => {
  *         description: success
  */
 local_microservice_1.api.get('/download/next', (req, res) => {
-    index_1.getNextDownload(client)
+    (0, index_1.getNextDownload)(client)
         .then(async (result) => {
         if (result) {
             if (!progress.active) {
                 progress.active = true;
             }
-            await node_fetch_1.default(local_logger_1.addToken(`http://localhost:${process.env.PORT}/download/file/${result}`, res));
+            await (0, node_fetch_1.default)((0, local_logger_1.addToken)(`http://localhost:${process.env.PORT}/download/file/${result}`, res));
             res.status(200).json({ message: 'Download started', id: result });
         }
         else {
@@ -125,44 +126,44 @@ local_microservice_1.api.get('/download/next', (req, res) => {
  *         description: success
  */
 local_microservice_1.api.get('/download/file/:fileId', (req, res) => {
-    const trans = local_logger_1.startTransaction({
+    const trans = (0, local_logger_1.startTransaction)({
         message: 'file download',
         id: req.params.fileId,
-        ...local_logger_1.localTokens(res),
+        ...(0, local_logger_1.localTokens)(res),
     });
     if ('fileId' in req.params && !isNaN(parseInt(req.params.fileId))) {
         const fileId = parseInt(req.params.fileId);
         res.status(200).json({ message: 'initiated file download', id: fileId });
-        index_1.getFile(client, fileId).then(file => {
-            download_1.download(file)
+        (0, index_1.getFile)(client, fileId).then(file => {
+            (0, download_1.download)(file)
                 .then(name => {
                 if (!name) {
                     file.state = 'ignore';
                 }
                 else {
                     file.state = 'downloaded';
-                    file.file = name;
+                    file.file = name.source;
                 }
-                return index_1.updateFile(client, file).then(async () => {
-                    await node_fetch_1.default(local_logger_1.addToken(`http://localhost:${process.env.PORT}/download/next`, res));
+                return (0, index_1.updateFile)(client, file, name ? name.files : [], name && name.layers ? name.layers : []).then(async () => {
+                    await (0, node_fetch_1.default)((0, local_logger_1.addToken)(`http://localhost:${process.env.PORT}/download/next`, res));
                     trans(true, {
                         message: 'download completed',
                         id: fileId,
-                        filename: name,
+                        filename: name ? name.source : '',
                     });
                 });
             })
                 .catch(async (err) => {
-                await index_1.failedFile(client, fileId).catch(err => {
-                    local_logger_1.logError({ message: err });
+                await (0, index_1.failedFile)(client, fileId).catch(err => {
+                    (0, local_logger_1.logError)({ message: err });
                 });
                 trans(false, {
                     message: 'download failed',
                     id: fileId,
                     err,
                 });
-                local_logger_1.logError({ ...local_logger_1.localTokens(res), message: err });
-                await node_fetch_1.default(local_logger_1.addToken(`http://localhost:${process.env.PORT}/download/next`, res));
+                (0, local_logger_1.logError)({ ...(0, local_logger_1.localTokens)(res), message: err });
+                await (0, node_fetch_1.default)((0, local_logger_1.addToken)(`http://localhost:${process.env.PORT}/download/next`, res));
             });
         });
     }
@@ -170,5 +171,5 @@ local_microservice_1.api.get('/download/file/:fileId', (req, res) => {
         res.status(400).json({ message: 'Valid id missing' });
     }
 });
-local_microservice_1.catchAll();
+(0, local_microservice_1.catchAll)();
 //# sourceMappingURL=index.js.map

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetFiles = exports.failedFile = exports.updateFile = exports.getFile = exports.getNextDownload = exports.getDownloadList = void 0;
+exports.failedFile = exports.updateFile = exports.getFile = exports.getNextDownload = exports.getDownloadList = void 0;
 const getDownloadList = (client, limit) => {
     return client
         .query(`SELECT * FROM "Downloads" WHERE state = 'new'${limit ? ' LIMIT ' + limit : ''}`)
@@ -17,11 +17,12 @@ const getNextDownload = (client) => {
          SELECT id
          FROM   "Downloads"
          WHERE  state = 'new'
+          OR state = 'updated'
          LIMIT  1
       )
       RETURNING id;`)
         .then(result => {
-        if (result.rows.length === 0) {
+        if (result.rowCount === 0) {
             return null;
         }
         else {
@@ -35,7 +36,7 @@ const getFile = (client, id) => {
         .query('SELECT * FROM "Downloads" WHERE id = $1', [id])
         .then(result => {
         return new Promise((resolve, reject) => {
-            if (result.rows.length === 0) {
+            if (result.rowCount === 0) {
                 reject('nothing found');
             }
             else {
@@ -45,30 +46,33 @@ const getFile = (client, id) => {
     });
 };
 exports.getFile = getFile;
-const updateFile = (client, file) => {
+const updateFile = (client, file, files, layers) => {
+    const fileValues = [];
+    const fileRemovals = [];
+    let insertString = '';
+    files.forEach((f, fi) => {
+        fileRemovals.push([file.id, f, layers ? layers[fi] : null]);
+        fileValues.push(file.id, f, layers ? layers[fi] : null);
+        insertString += `${fi > 0 ? ',' : ''}($${fi * 3 + 1}, $${fi * 3 + 2}, $${fi * 3 + 3})`;
+    });
     return client
         .query(`UPDATE "Downloads" SET
       state = $1,
       file = $2,
       downloaded = $3
     WHERE id = $4`, [file.state, file.file, new Date().toISOString(), file.id])
+        .then(() => Promise.all(fileRemovals.map(fileValue => client.query('DELETE FROM "DownloadedFiles" WHERE download_id = $1 AND file = $2 AND layer_name = $3', fileValue))))
+        .then(() => client.query(`INSERT INTO "DownloadedFiles" (download_id, file, layer_name) VALUES ${insertString}`, fileValues))
         .then(() => { });
 };
 exports.updateFile = updateFile;
 const failedFile = (client, fileId) => {
     return client
         .query(`UPDATE "Downloads" SET
+      downloaded = $1,
       state = 'failed'
-    WHERE id = $1`, [fileId])
+    WHERE id = $2`, [new Date().toISOString(), fileId])
         .then(() => { });
 };
 exports.failedFile = failedFile;
-const resetFiles = (client) => {
-    return client
-        .query(`UPDATE "Downloads" SET
-      state = 'updated'
-      WHERE state = 'downloading'`)
-        .then(() => { });
-};
-exports.resetFiles = resetFiles;
 //# sourceMappingURL=index.js.map

@@ -1,115 +1,183 @@
 import {File} from './types';
-import * as https from 'https';
-import * as http from 'http';
 import * as fs from 'fs';
 import {accept} from './accept';
-import {wfs} from './special/wfs';
+import {isWfs, wfs} from './special/wfs';
 import {nas} from './special/nas';
+import {Client} from 'pg';
+import {directDownload} from './utils';
 
 export const nameFromFile = (file: File): string => {
   let name = file.url.substr(file.url.lastIndexOf('/') + 1);
   if (name.indexOf('?') > -1) {
     name = name.substr(0, name.indexOf('?'));
   }
+  name = name.replace(/[^a-zA-Z0-9._-]/g, '');
   return `${file.id}--${name}`;
 };
 
-export const endInterval = (interval: null | NodeJS.Timeout): void => {
-  if (interval) {
-    clearInterval(interval);
+export const download = (
+  file: File
+): Promise<
+  {source: string; files: string[]; layers?: string[]} | false | null
+> => {
+  const targetName = nameFromFile(file);
+  const targetLocation = process.env.DOWNLOAD_LOCATION + '/' + targetName;
+  if (accept(file)) {
+    if (file.format && file.format.toLowerCase() === 'wfs') {
+      return isWfs(file.url).then(wfsCheck => {
+        if (wfsCheck) {
+          return wfs(file, targetName);
+        } else {
+          return directDownload(file.url, targetLocation).then(() => {
+            return {source: targetName, files: [targetName]};
+          });
+        }
+      });
+    } else if (file.format && file.format.toLowerCase() === 'nas') {
+      return nas(file, targetName);
+    } else if (file.format && file.format.toLowerCase() === 'download') {
+      return isWfs(file.url).then(wfsCheck => {
+        if (wfsCheck) {
+          return wfs(file, targetName);
+        } else {
+          return directDownload(file.url, targetLocation).then(() => {
+            return {source: targetName, files: [targetName]};
+          });
+        }
+      });
+    } else {
+      return directDownload(file.url, targetLocation).then(() => {
+        return {source: targetName, files: [targetName]};
+      });
+    }
+  } else {
+    return Promise.resolve(false);
   }
 };
 
-export const directDownload = (file: File, name: string): Promise<string> => {
-  const targetLocation = process.env.DOWNLOAD_LOCATION + name;
-  return new Promise((resolve, reject) => {
-    const target = fs.createWriteStream(targetLocation);
-    target.on('error', err => {
-      fs.unlink(targetLocation, () => {
-        reject(err);
-      });
-    });
+export const resetMissingDownloads = async (client: Client): Promise<void> => {
+  const downloads = await client
+    .query(
+      "SELECT id, url, format, file FROM \"Downloads\" WHERE state != 'ignore' AND state != 'failed' AND file IS NOT NULL"
+    )
+    .then(result => result.rows);
 
-    // Some servers respond extremely slow and fail, but never properly fail
-    // This interval checks every 5 minutes, if the file size has increased
-    // If nothing happens for 5 minutes, download is considered failed
-    let interval: null | NodeJS.Timeout = null;
+  const missingDownloads: number[] = [];
 
-    let requestPackage;
-    if (file.url.indexOf('https') === 0) {
-      requestPackage = https;
-    } else {
-      requestPackage = http;
+  for (let d = 0; d < downloads.length; d += 1) {
+    if (
+      !fs.existsSync(process.env.DOWNLOAD_LOCATION + '/' + downloads[d].file)
+    ) {
+      missingDownloads.push(downloads[d].id);
     }
-    requestPackage
-      .get(file.url, response => {
-        if (
-          response.statusCode &&
-          response.statusCode >= 200 &&
-          response.statusCode < 300
-        ) {
-          response.pipe(target);
-          let fileSize = 0;
-          interval = setInterval(() => {
-            console.log('check');
-            const stats = fs.statSync(targetLocation);
-            if (stats.size > fileSize) {
-              fileSize = stats.size;
-              console.log('continue', fileSize);
-            } else {
-              console.log('abort');
-              target.end();
-              endInterval(interval);
-              fs.unlink(targetLocation, () => {
-                reject('could not finish');
-              });
-            }
-          }, 1000 * 60 * 5);
+  }
 
-          target.on('finish', () => {
-            endInterval(interval);
-            resolve(name);
-          });
-        } else if (
-          response.statusCode &&
-          response.statusCode === 302 &&
-          response.headers.location
-        ) {
-          // handle 302 redirects
-          // TODO: if something redirects forever... this will never end... add max redirects
-          file.url = response.headers.location;
-          endInterval(interval);
-          resolve(directDownload(file, name));
-        } else {
-          target.end();
-          endInterval(interval);
-          fs.unlink(targetLocation, () => {
-            reject(response.statusCode);
-          });
-        }
-      })
-      .on('error', err => {
-        target.end();
-        endInterval(interval);
-        fs.unlink(targetLocation, () => {
-          reject(err);
-        });
-      });
-  });
+  if (missingDownloads.length > 0) {
+    await client.query(
+      `UPDATE "Downloads" SET file = NULL, downloaded = NULL, state = 'updated' WHERE id IN (${missingDownloads.join(
+        ','
+      )})`
+    );
+  }
 };
 
-export const download = (file: File): Promise<string | false> => {
-  if (accept(file)) {
-    if (
-      file.format === 'wfs' &&
-      (file.mimetype === 'false' || file.mimetype === 'application/xml')
-    ) {
-      return wfs(file, nameFromFile(file));
-    } else if (file.format === 'nas' && file.mimetype === 'false') {
-      return nas(file, nameFromFile(file));
+export const resetDownloads = async (client: Client): Promise<void> => {
+  const downloads = await client
+    .query('SELECT file FROM "Downloads" WHERE state = \'downloading\'')
+    .then(result => result.rows || []);
+
+  for (let d = 0; d < downloads.length; d += 1) {
+    const fileLocation =
+      process.env.DOWNLOAD_LOCATION + '/' + downloads[d].file;
+    if (fs.existsSync(fileLocation)) {
+      const info = fs.lstatSync(fileLocation);
+      if (info.isDirectory()) {
+        fs.rmdirSync(fileLocation, {recursive: true});
+      } else {
+        fs.unlinkSync(fileLocation);
+      }
     }
-    return directDownload(file, nameFromFile(file));
-  } else {
-    return Promise.resolve(false);
+  }
+
+  return client
+    .query(
+      `UPDATE "Downloads" SET
+      state = 'updated'
+      WHERE state = 'downloading'`
+    )
+    .then(() => {});
+};
+
+export const removeEmpty = async (client: Client): Promise<void> => {
+  const downloads = await client
+    .query(
+      "SELECT id, file, format FROM \"Downloads\" WHERE (state = 'downloaded' OR state = 'downloading') AND (fails IS NULL OR fails < 5)"
+    )
+    .then(result => result.rows || []);
+
+  const downloadedFiles = downloads.map(d => d.file);
+
+  if (process.env.DOWNLOAD_LOCATION) {
+    const files = fs.readdirSync(process.env.DOWNLOAD_LOCATION);
+    for (let f = 0; f < files.length; f += 1) {
+      const file = files[f];
+      const stats = fs.statSync(process.env.DOWNLOAD_LOCATION + file);
+      if (file !== '.' && file !== '..') {
+        const fileIndex = downloadedFiles.indexOf(file);
+        if (stats.isDirectory()) {
+          let isEmpty = true;
+          let onlyGetCapabilities = false;
+          const contents = fs.readdirSync(process.env.DOWNLOAD_LOCATION + file);
+          for (let c = 0; c < contents.length; c += 1) {
+            const content = contents[c];
+            if (content !== '.' && content !== '..') {
+              const contentPath =
+                process.env.DOWNLOAD_LOCATION + file + '/' + content;
+              const cStats = fs.statSync(contentPath);
+              if (cStats.size === 0 || content === 'GetCapabilities.json') {
+                if (content !== 'GetCapabilities.json') {
+                  fs.unlinkSync(contentPath);
+                } else {
+                  onlyGetCapabilities = true;
+                }
+              } else {
+                isEmpty = false;
+              }
+            }
+          }
+          if (isEmpty) {
+            if (onlyGetCapabilities) {
+              fs.unlinkSync(
+                process.env.DOWNLOAD_LOCATION + file + '/GetCapabilities.json'
+              );
+            }
+            if (fileIndex > -1) {
+              await client.query(
+                `UPDATE "Downloads" SET state = '${
+                  downloads[fileIndex].format === 'wfs' ? 'updated' : 'failed'
+                }', file = NULL, fails = $1 WHERE id = $2`,
+                [
+                  downloads[fileIndex].fails
+                    ? downloads[fileIndex].fails + 1
+                    : 1,
+                  downloads[fileIndex].id,
+                ]
+              );
+            }
+            fs.rmdirSync(process.env.DOWNLOAD_LOCATION + file, {
+              recursive: true,
+            });
+          }
+        } else if (stats.size === 0) {
+          if (fileIndex > -1) {
+            await client.query(
+              'UPDATE "Downloads" SET state = \'failed\', file = NULL WHERE id = $1',
+              [downloads[fileIndex].id]
+            );
+          }
+          fs.unlinkSync(process.env.DOWNLOAD_LOCATION + file);
+        }
+      }
+    }
   }
 };

@@ -1,0 +1,3 @@
+- remove WMS and PDF! > migration
+- after download is finished check if queue is full
+- remove process from queue after fail

@@ -1,0 +1,10 @@
+import { Client } from 'pg';
+export declare const saveDownloadedFile: (client: Client, download_id: number, file: string) => Promise<void>;
+export declare const downloadedFiles: (client: Client) => Promise<void>;
+export declare const removeBanned: (client: Client) => Promise<void>;
+export declare const fixOrphanFolders: (client: Client) => Promise<void>;
+export declare const fixOldDownloadNames: (client: Client) => Promise<void>;
+export declare const fixAbsPath: (client: Client) => Promise<void>;
+export declare const moveCapabilities: () => void;
+export declare const fixMissingDownloadedFiles: (client: Client) => Promise<void>;
+export declare const wfsNameFix: (client: Client) => Promise<void>;
