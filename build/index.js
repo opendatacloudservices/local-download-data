@@ -5,12 +5,12 @@ const path = require("path");
 const pg_1 = require("pg");
 const node_fetch_1 = require("node-fetch");
 const index_1 = require("./postgres/index");
-const pm2 = require("local-pm2-config");
+const pm2 = require("@opendatacloudservices/local-pm2-config");
 const download_1 = require("./download");
 // get environmental variables
 dotenv.config({ path: path.join(__dirname, '../.env') });
-const local_microservice_1 = require("local-microservice");
-const local_logger_1 = require("local-logger");
+const local_microservice_1 = require("@opendatacloudservices/local-microservice");
+const local_logger_1 = require("@opendatacloudservices/local-logger");
 // number of parallel processes
 let processCount = 1;
 pm2.apps.forEach(app => {
@@ -32,9 +32,13 @@ const client = new pg_1.Client({
 });
 client
     .connect()
+    .then(() => console.log('connected'))
     .then(() => (0, download_1.resetMissingDownloads)(client))
+    .then(() => console.log('resetMissingDownloads'))
     .then(() => (0, download_1.resetDownloads)(client))
-    .then(() => (0, download_1.removeEmpty)(client))
+    .then(() => console.log('resetDownloads'))
+    // TODO: Better way for removing empty??
+    // .then(() => removeEmpty(client))
     .then(() => console.log('ready'))
     .catch(err => {
     (0, local_logger_1.logError)({ message: err });

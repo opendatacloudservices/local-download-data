@@ -3,9 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ogr2ogr = exports.ogr2ogrUrlPrepare = exports.removeOgr2ogr = exports.wfs = exports.getCapabilities = exports.prepareWfsUrl = exports.removeRequests = exports.isWfs = void 0;
 const node_fetch_1 = require("node-fetch");
 const fs = require("fs");
-const parser = require("fast-xml-parser");
+const fast_xml_parser_1 = require("fast-xml-parser");
 const child_process_1 = require("child_process");
-const build_1 = require("local-logger/build");
+const local_logger_1 = require("@opendatacloudservices/local-logger");
 const utils_1 = require("../utils");
 const capabilitiesLimit = 10 * 1024 * 1024;
 const isWfs = (url) => {
@@ -92,7 +92,11 @@ const getCapabilities = (url, target, deleteAfter = false) => {
             const stats = fs.statSync(target);
             if (stats.size < capabilitiesLimit) {
                 const fileContents = fs.readFileSync(target, 'utf8');
-                const json = parser.parse(fileContents, { ignoreNameSpace: true }, false);
+                const parser = new fast_xml_parser_1.XMLParser({
+                    ignoreAttributes: false,
+                    removeNSPrefix: true,
+                });
+                const json = parser.parse(fileContents, false);
                 if (deleteAfter) {
                     fs.unlinkSync(target);
                 }
@@ -111,8 +115,6 @@ const wfs = (file, fileName) => {
         fs.mkdirSync(folder);
     }
     const url = (0, exports.prepareWfsUrl)(file.url);
-    // 'https://fbinter.stadt-berlin.de/fb/wfs/data/senstadt/s_wfs_alkis';
-    // 'https://geo.sv.rostock.de/geodienste/bplaene/wfs';
     return (0, exports.getCapabilities)(url, folder + '/GetCapabilities.json')
         .then(async (json) => {
         if (!json || !('WFS_Capabilities' in json)) {
@@ -142,10 +144,10 @@ const wfs = (file, fileName) => {
                     // those get picked up and sorted out by the spatial classification process
                     // another problem is layers without geometries or much else (which sadly do exist a lot, thank you)
                     (0, exports.removeOgr2ogr)(folder, fi, feature);
-                    (0, build_1.logError)({ ...err, ogrLevel: 1 });
+                    (0, local_logger_1.logError)({ ...err, ogrLevel: 1 });
                     (0, exports.ogr2ogr)(folder, fi, feature.split(':')[1], url, err => {
                         (0, exports.removeOgr2ogr)(folder, fi, feature.split(':')[1]);
-                        (0, build_1.logError)({ ...err, ogrLevel: 2 });
+                        (0, local_logger_1.logError)({ ...err, ogrLevel: 2 });
                         resolve(null);
                     }, () => {
                         resolve([fileList[fi], feature.split(':')[1]]);

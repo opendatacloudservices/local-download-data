@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.accept = void 0;
-const local_logger_1 = require("local-logger");
+const local_logger_1 = require("@opendatacloudservices/local-logger");
 // for now we only accept machine readable data
 // acceptedFormat is combined with acceptedMimetype (see below)
 const acceptedFormat = [

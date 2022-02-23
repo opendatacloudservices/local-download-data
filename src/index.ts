@@ -8,20 +8,25 @@ import {
   updateFile,
   getNextDownload,
 } from './postgres/index';
-import * as pm2 from 'local-pm2-config';
+import * as pm2 from '@opendatacloudservices/local-pm2-config';
 import {
   download,
   resetMissingDownloads,
   resetDownloads,
-  removeEmpty,
+  // removeEmpty,
 } from './download';
 
 // get environmental variables
 dotenv.config({path: path.join(__dirname, '../.env')});
 
-import {api, catchAll} from 'local-microservice';
+import {api, catchAll} from '@opendatacloudservices/local-microservice';
 
-import {addToken, startTransaction, localTokens, logError} from 'local-logger';
+import {
+  addToken,
+  startTransaction,
+  localTokens,
+  logError,
+} from '@opendatacloudservices/local-logger';
 
 // number of parallel processes
 let processCount = 1;
@@ -45,9 +50,13 @@ const client = new Client({
 });
 client
   .connect()
+  .then(() => console.log('connected'))
   .then(() => resetMissingDownloads(client))
+  .then(() => console.log('resetMissingDownloads'))
   .then(() => resetDownloads(client))
-  .then(() => removeEmpty(client))
+  .then(() => console.log('resetDownloads'))
+  // TODO: Better way for removing empty??
+  // .then(() => removeEmpty(client))
   .then(() => console.log('ready'))
   .catch(err => {
     logError({message: err});

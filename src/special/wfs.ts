@@ -1,9 +1,9 @@
 import fetch from 'node-fetch';
 import * as fs from 'fs';
-import * as parser from 'fast-xml-parser';
+import {XMLParser} from 'fast-xml-parser';
 import {exec, ExecException} from 'child_process';
 import type {File} from '../types';
-import {logError} from 'local-logger/build';
+import {logError} from '@opendatacloudservices/local-logger';
 import {directDownload, tempName} from '../utils';
 
 const capabilitiesLimit = 10 * 1024 * 1024;
@@ -103,7 +103,11 @@ export const getCapabilities = (
       const stats = fs.statSync(target);
       if (stats.size < capabilitiesLimit) {
         const fileContents = fs.readFileSync(target, 'utf8');
-        const json = parser.parse(fileContents, {ignoreNameSpace: true}, false);
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          removeNSPrefix: true,
+        });
+        const json = parser.parse(fileContents, false);
         if (deleteAfter) {
           fs.unlinkSync(target);
         }
@@ -126,8 +130,6 @@ export const wfs = (
   }
 
   const url = prepareWfsUrl(file.url);
-  // 'https://fbinter.stadt-berlin.de/fb/wfs/data/senstadt/s_wfs_alkis';
-  // 'https://geo.sv.rostock.de/geodienste/bplaene/wfs';
 
   return getCapabilities(url, folder + '/GetCapabilities.json')
     .then(async json => {

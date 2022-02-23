@@ -1,5 +1,5 @@
 import type {File} from './types';
-import {logInfo} from 'local-logger';
+import {logInfo} from '@opendatacloudservices/local-logger';
 
 // for now we only accept machine readable data
 // acceptedFormat is combined with acceptedMimetype (see below)
