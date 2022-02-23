@@ -1,6 +1,6 @@
 {
-  "name": "local-download-data",
-  "version": "1.0.0",
+  "name": "@opendatacloudservices/local-download-data",
+  "version": "1.0.1",
   "description": "Download open data for local processing",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
