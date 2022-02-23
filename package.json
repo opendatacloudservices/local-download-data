@@ -1,6 +1,6 @@
 {
   "name": "@opendatacloudservices/local-download-data",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Download open data for local processing",
   "main": "./build/index.js",
   "types": "./build/index.d.ts",
@@ -11,7 +11,16 @@
   "files": [
     "build/src"
   ],
-  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/opendatacloudservices/local-download-data.git"
+  },
+  "author": "sebastian-meier",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/opendatacloudservices/local-download-data/issues"
+  },
+  "homepage": "https://github.com/opendatacloudservices/local-download-data#readme",
   "keywords": [],
   "jest": {
     "testEnvironment": "node"
