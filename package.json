@@ -9,7 +9,7 @@
     "node": ">=17.5.0"
   },
   "files": [
-    "build/src"
+    "build"
   ],
   "repository": {
     "type": "git",
