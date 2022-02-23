@@ -145,13 +145,13 @@ test('ogr2ogrUrlPrepare', () => {
   });
 });
 
-test('wfs - 808247', async () => {
-  const client = await getClient();
-  const file = await getFile(client, 808247);
-  expect(file.id).toBe(808247);
-  expect(await isWfs(file.url)).toBe(true);
-  const result = await download(file);
-  expect(result.source).toBe('808247--HH_WFS_xplan_dls');
-  expect(result.files.length).toBe(192);
-})
+// test('wfs - 808247', async () => {
+//   const client = await getClient();
+//   const file = await getFile(client, 808247);
+//   expect(file.id).toBe(808247);
+//   expect(await isWfs(file.url)).toBe(true);
+//   const result = await download(file);
+//   expect(result.source).toBe('808247--HH_WFS_xplan_dls');
+//   expect(result.files.length).toBe(192);
+// })
 
